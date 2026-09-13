@@ -21,7 +21,7 @@ def translate_jira():
     prompt = f"Translate the following text into natural, professional Arabic. Output only the Arabic translation:\n\n{text_to_translate}"
     
     response = ai_client.models.generate_content(
-        model='gemini-2.5-flash',
+        model='gemini-1.5-flash',
         contents=prompt,
     )
     arabic_translation = response.text.strip()
