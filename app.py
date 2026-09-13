@@ -17,48 +17,56 @@ def translate_jira():
     if not text_to_translate or not issue_key:
         return jsonify({"error": "Missing text or issue_key"}), 400
 
-    # Call Gemini Free API
-    prompt = f"Translate the following text into natural, professional Arabic. Output only the Arabic translation:\n\n{text_to_translate}"
-    
-    response = ai_client.models.generate_content(
-        model='gemini-1.5-flash',
-        contents=prompt,
-    )
-    arabic_translation = response.text.strip()
+    try:
+        # Call Gemini API with valid model name
+        prompt = f"Translate the following text into natural, professional Arabic. Output ONLY the Arabic translation:\n\n{text_to_translate}"
+        
+        response = ai_client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt,
+        )
+        arabic_translation = response.text.strip()
 
-    # Post Comment back to Jira
-    jira_domain = os.environ.get("JIRA_DOMAIN")
-    jira_email = os.environ.get("JIRA_EMAIL")
-    jira_token = os.environ.get("JIRA_API_TOKEN")
+        # Jira Credentials
+        jira_domain = os.environ.get("JIRA_DOMAIN")
+        jira_email = os.environ.get("JIRA_EMAIL")
+        jira_token = os.environ.get("JIRA_API_TOKEN")
 
-    jira_url = f"https://{jira_domain}/rest/api/3/issue/{issue_key}/comment"
-    auth = (jira_email, jira_token)
-    headers = {"Content-Type": "application/json"}
-
-    comment_payload = {
-        "body": {
-            "type": "doc",
-            "version": 1,
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"🌐 **Arabic Translation:**\n\n{arabic_translation}"
-                        }
-                    ]
-                }
-            ]
+        jira_url = f"https://{jira_domain}/rest/api/3/issue/{issue_key}/comment"
+        auth = (jira_email, jira_token)
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
         }
-    }
 
-    jira_res = requests.post(jira_url, json=comment_payload, auth=auth, headers=headers)
-    
-    if jira_res.status_code in [200, 201]:
-        return jsonify({"status": "success", "translation": arabic_translation}), 200
-    else:
-        return jsonify({"error": "Failed to post comment to Jira", "details": jira_res.text}), 500
+        # Atlassian Document Format (ADF)
+        comment_payload = {
+            "body": {
+                "version": 1,
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Arabic Translation:\n\n{arabic_translation}"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+        jira_res = requests.post(jira_url, json=comment_payload, auth=auth, headers=headers)
+        
+        if jira_res.status_code in [200, 201]:
+            return jsonify({"status": "success", "translation": arabic_translation}), 200
+        else:
+            return jsonify({"error": "Jira API Error", "status_code": jira_res.status_code, "details": jira_res.text}), 500
+
+    except Exception as e:
+        return jsonify({"error": "Server Exception", "details": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
