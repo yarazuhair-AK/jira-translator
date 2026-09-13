@@ -1,12 +1,8 @@
 import os
 import requests
 from flask import Flask, request, jsonify
-from google import genai
 
 app = Flask(__name__)
-
-# Initialize Gemini Client
-ai_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 @app.route('/translate', methods=['POST'])
 def translate_jira():
@@ -18,16 +14,27 @@ def translate_jira():
         return jsonify({"error": "Missing text or issue_key"}), 400
 
     try:
-        # Call Gemini API with valid model name
-        prompt = f"Translate the following text into natural, professional Arabic. Output ONLY the Arabic translation:\n\n{text_to_translate}"
+        # 1. Direct REST Call to Google Gemini (No SDK needed)
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
         
-        response = ai_client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=prompt,
-        )
-        arabic_translation = response.text.strip()
+        prompt = f"Translate the following text into natural, professional Arabic. Output ONLY the Arabic translation, nothing else:\n\n{text_to_translate}"
+        
+        gemini_payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+        
+        g_res = requests.post(gemini_url, json=gemini_payload, headers={"Content-Type": "application/json"})
+        g_data = g_res.json()
 
-        # Jira Credentials
+        if g_res.status_code != 200:
+            return jsonify({"error": "Gemini API Error", "details": g_data}), 500
+
+        arabic_translation = g_data['candidates'][0]['content']['parts'][0]['text'].strip()
+
+        # 2. Post Comment to Jira
         jira_domain = os.environ.get("JIRA_DOMAIN")
         jira_email = os.environ.get("JIRA_EMAIL")
         jira_token = os.environ.get("JIRA_API_TOKEN")
@@ -39,7 +46,6 @@ def translate_jira():
             "Content-Type": "application/json"
         }
 
-        # Atlassian Document Format (ADF)
         comment_payload = {
             "body": {
                 "version": 1,
@@ -50,7 +56,7 @@ def translate_jira():
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Arabic Translation:\n\n{arabic_translation}"
+                                "text": f"🌐 Arabic Translation:\n\n{arabic_translation}"
                             }
                         ]
                     }
