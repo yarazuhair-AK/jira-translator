@@ -14,9 +14,9 @@ def translate_jira():
         return jsonify({"error": "Missing text or issue_key"}), 400
 
     try:
-        # 1. Direct REST Call to Google Gemini (No SDK needed)
+        # 1. Direct REST Call to Google Gemini API
         gemini_key = os.environ.get("GEMINI_API_KEY")
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_key}"
         
         prompt = f"Translate the following text into natural, professional Arabic. Output ONLY the Arabic translation, nothing else:\n\n{text_to_translate}"
         
@@ -34,7 +34,7 @@ def translate_jira():
 
         arabic_translation = g_data['candidates'][0]['content']['parts'][0]['text'].strip()
 
-        # 2. Post Comment to Jira
+        # 2. Post Comment to Jira API
         jira_domain = os.environ.get("JIRA_DOMAIN")
         jira_email = os.environ.get("JIRA_EMAIL")
         jira_token = os.environ.get("JIRA_API_TOKEN")
